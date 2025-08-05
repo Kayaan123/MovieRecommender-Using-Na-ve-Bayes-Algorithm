@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.naive_bayes import BernoulliNB
 X_train = np.array([
     [0,1,1],
     [0,0,1],
@@ -8,7 +9,9 @@ X_train = np.array([
 Y_train = ['Y','N','Y','Y']
 X_test = np.array([[1,1,0]])
 
-def get_label_indices(labels):
+
+#group the data by label and record their label indices by classes
+def get_label_indices(labels): 
     """
     Group samples based on their labels and return indices
     @param labels:list of labels
@@ -21,7 +24,7 @@ def get_label_indices(labels):
         label_indices[label].append(index)
     return label_indices
 
-def get_prior(label_indices):
+def get_prior(label_indices): #calculate the prior
     """
     compute prior based on training samples
     @param label indices: grouped sampled indices by class
@@ -35,7 +38,7 @@ def get_prior(label_indices):
     return prior
 
 
-
+#likelihood is P(feature|class)
 def get_likelihood(features, label_indices, smoothing = 0):
 
     """
@@ -53,6 +56,7 @@ def get_likelihood(features, label_indices, smoothing = 0):
         likelihood[label] = likelihood[label] / (total_count + 2 * smoothing)
     return likelihood
 
+#compute the posterior for the testing/new samples
 def get_posterior(X, prior, likelihood):
     """
     Computer posterior of testing samples, based on prior and likelihood
@@ -88,3 +92,10 @@ likelihood = get_likelihood = get_likelihood(X_train, label_indices, smoothing)
 print('Likelihood:\n',likelihood)
 posterior = get_posterior(X_test, prior, likelihood)
 print('Posterior:\n', posterior)
+
+clf = BernoulliNB(alpha=1.0,fit_prior=True) #classifier
+clf.fit(X_train,Y_train) 
+pred_prob = clf.predict_proba(X_test)
+print('[scikit-learn] Predicted probabilities: \n', pred_prob)
+pred = clf.predict(X_test)
+print('[scikit-learn] Prediction:', pred)
