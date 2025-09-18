@@ -3,6 +3,12 @@ from collections import defaultdict
 import csv
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_score, recall_score, f1_score
+from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_auc_score
+from sklearn.model_selection import StratifiedKFold
 data_path = '/Users/kayaansomchand/Documents/Internship/MovieRecommender/MovieRecommender-Using-Na-ve-Bayes-Algorithm/ml-latest-small/ratings.csv'
 
 """
@@ -79,4 +85,70 @@ prediction = clf.predict(X_test)
 print(prediction[:10])
 
 accuracy = clf.score(X_test, Y_test)
-print(f'accuracy is: {accuracy*100:.1f}%')
+print(f'accuracy is: {accuracy*100:.1f}%') #TN+TP/TN+TP+FP+FN
+print(confusion_matrix(Y_test,prediction,labels=[0,1])) # |TN FP|FN TP|
+precision_score(Y_test,prediction,pos_label=1) #TP/TP+FP'
+recall_score(Y_test,prediction,pos_label=1) #TP/TP+FN
+f1_score(Y_test,prediction,pos_label=1)#2* precision*recall/precision+recall
+report = classification_report(Y_test,prediction)
+print(report)
+pos_prob = prediction_prob[:,1]
+thresholds = np.arange(0.0,1.1,0.05)
+true_pos, false_pos = [0]*len(thresholds), [0]*len(thresholds)
+for pred, y in zip(pos_prob,Y_test):
+    for i, threshold in enumerate(thresholds):
+        if pred >= threshold:
+            if y==1:
+                true_pos[i] += 1
+            else:
+                false_pos[i]+=1
+        else:
+            break
+
+n_pos_test = (Y_test==1).sum()
+n_neg_test = (Y_test==0).sum()
+true_pos_rate = [tp/n_pos_test for tp in true_pos]
+false_pos_rate = [fp/n_neg_test for fp in false_pos]
+
+
+plt.figure()
+lw = 2
+plt.plot(false_pos_rate,true_pos_rate,color = 'darkorange', lw=lw)
+plt.plot([0,1],[0,1],color='navy',lw=lw,linestyle='--')
+plt.xlim([0.0,1.0])
+plt.ylim([0.0,1.05])
+plt.xlabel('False Positive Rate')
+plt.ylabel('True Positive Rate')
+plt.title('Receiver Operator Characteristic')
+plt.legend(loc="lower right")
+plt.show()
+
+roc_auc_score(Y_test,pos_prob)
+k = 5
+k_fold = StratifiedKFold(n_splits=k, random_state=42)
+smoothing_factor_option = [1,2,3,4,5,6]
+fit_prior_option = [True,False]
+auc_record = {}
+
+for train_indices, test_indices in k_fold.split(X,Y):
+    X_train, X_test = X[train_indices], X[test_indices]
+    Y_train,Y_test = Y[train_indices], Y[test_indices]
+    for alpha in smoothing_factor_option:
+        if alpha not in auc_record:
+            auc_record = {}
+        for fit_prior in fit_prior_option:
+            clf = MultinomialNB(alpha=alpha, fit_prior=fit_prior)
+            clf.fit(X_train, Y_train)
+            prediction_prob = clf.predict_proba(X_test)
+            pos_prob=prediction_prob[:,1]
+            auc = roc_auc_score(Y_test,pos_prob)
+            auc_record[alpha][fit_prior] = auc + auc_record[alpha].get(fit_prior,0.0)
+
+for smoothing, smoothing_record in auc_record.items():
+    for fit_prior, auc, in smoothing_record.items():
+        print(f' {smoothing} {fit_prior} {auc/k:.5f}')
+
+clf = MultinomialNB(alpha=2.0, fit_prior=False)
+clf.fit(X_train, Y_train)
+pos_prob = clf.predict_proba(X_test)[:, 1]
+print('AUC with the the best model:', roc_auc_score(Y_test,pos_prob))
